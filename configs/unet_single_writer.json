@@ -1,0 +1,20 @@
+{
+  "task": "single_writer_chinese_calligraphy_generation",
+  "scope": "Chinese only for stage 1. English, numbers, and punctuation are out of scope.",
+  "image_size": 128,
+  "train_ratio": 0.9,
+  "batch_size": 16,
+  "epochs": 20,
+  "learning_rate": 0.0002,
+  "lambda_l1": 100.0,
+  "eval_text": "一中国永道德山水风月",
+  "quality_focus": [
+    "clear glyph structure",
+    "clear stroke boundaries",
+    "no missing strokes",
+    "no extra strokes",
+    "no over-dark dirty output",
+    "usable for binarization, skeleton extraction, and similarity evaluation"
+  ]
+}
+
