@@ -138,6 +138,7 @@ def main() -> None:
     parser.add_argument("--lr", default=2e-4, type=float)
     parser.add_argument("--lambda-l1", default=100.0, type=float)
     parser.add_argument("--image-size", default=128, type=int)
+    parser.add_argument("--num-workers", default=2, type=int)
     parser.add_argument("--seed", default=42, type=int)
     args = parser.parse_args()
 
@@ -157,8 +158,20 @@ def main() -> None:
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.5, 0.999))
     l1 = nn.L1Loss()
 
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=2, pin_memory=device.type == "cuda")
-    val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=2, pin_memory=device.type == "cuda")
+    train_loader = DataLoader(
+        train_set,
+        batch_size=args.batch_size,
+        shuffle=True,
+        num_workers=args.num_workers,
+        pin_memory=device.type == "cuda",
+    )
+    val_loader = DataLoader(
+        val_set,
+        batch_size=args.batch_size,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=device.type == "cuda",
+    )
 
     best_val = float("inf")
     log_path = out_dir / "train_log.csv"
