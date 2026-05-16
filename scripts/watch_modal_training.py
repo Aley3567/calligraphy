@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import subprocess
 import time
 from datetime import datetime, timezone
@@ -94,6 +95,7 @@ def main() -> None:
     handoff_file = out_dir / "monitor-handoff.md"
     local_artifacts = out_dir / "artifacts"
     local_artifacts.mkdir(parents=True, exist_ok=True)
+    (out_dir / "watch.pid").write_text(f"{os.getpid()}\n", encoding="utf-8")
 
     last_epoch = None
     while True:
