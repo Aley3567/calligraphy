@@ -20,16 +20,6 @@ Current next work:
 preprocessing + evaluation + structure-aware loss infrastructure
 ```
 
-Not current work:
-
-```text
-plain Pix2Pix
-U-Net resume
-blind epoch extension
-3x3090 experiment sweep
-FontDiffuser retry
-```
-
 ## Branch Rules
 
 ```text
@@ -49,14 +39,7 @@ Recommended issues now:
 [Preprocessing] target mask/skeleton/distance/hole maps
 [Evaluation] fixed high-risk character board and metrics
 [Model] structure-aware U-Net loss design
-[Docs] algorithm audit and stop rules
-```
-
-Avoid issues like:
-
-```text
-[Training] run Pix2Pix again
-[Training] continue U-Net epochs
+[Docs] structure preprocessing and evaluation usage
 ```
 
 ## What Goes Into Git

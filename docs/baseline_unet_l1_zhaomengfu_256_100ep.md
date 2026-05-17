@@ -38,7 +38,6 @@ and content-to-calligraphy generation path are working. The generated characters
 mostly recognizable and show clear brush-style transfer. It is not the final model:
 complex characters still lose fine structure, and some outputs are too dark or blob-like.
 
-This checkpoint remains the current promoted baseline. The subsequent Pix2Pix and
-U-Net resume runs were not promoted. The next valid work is not another plain training
-run; it is the structure-aware preprocessing, evaluation, and loss redesign described
-in `docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md`.
+This checkpoint remains the current promoted baseline. The next work is the
+structure-aware preprocessing, evaluation, and loss redesign described in
+`docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md`.

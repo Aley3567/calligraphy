@@ -2,7 +2,7 @@
 
 ## Stage 1 Scope
 
-老师已确认第一阶段先做中文书法/手写体仿真生成，不先考虑英文、数字和标点。
+老师已确认第一阶段范围是中文书法/手写体仿真生成。
 
 当前任务定义：
 
@@ -35,21 +35,9 @@ U-Net L1 baseline best.pt
 baseline best val_l1 = 0.12746000836292903
 ```
 
-不进入主线：
+## Why Evaluation Comes First
 
-```text
-Pix2Pix:
-  val_l1 = 0.19153394765324064
-  reason = local realism damaged global glyph structure
-
-U-Net resume:
-  val_l1 = 0.12922164450089138
-  reason = did not beat baseline best and continued dark/thick stroke risk
-```
-
-## Why Training Is Paused
-
-继续裸 U-Net + L1、继续加 epoch、继续 Pix2Pix 都已经暴露同一个问题：
+当前关键问题是：
 
 ```text
 loss 优化不等于汉字结构变好
@@ -64,11 +52,11 @@ loss 优化不等于汉字结构变好
 局部像书法但整体不像字
 ```
 
-因此后续不能再以 `val_l1` 或单张 preview 作为主判断依据。
+因此下一步先建设固定结构评估和结构辅助图，再接入结构保真模型。
 
 ## Next Valid Algorithm Direction
 
-下一阶段只允许做结构化底座：
+下一阶段主线是结构化底座：
 
 ```text
 1. preprocessing:
@@ -90,18 +78,6 @@ loss 优化不等于汉字结构变好
    structure-aware U-Net
    mask head + ink head
    gray + mask + edge + density + hole + bbox loss
-```
-
-## Forbidden For Now
-
-```text
-do not continue U-Net L1 epochs
-do not run plain Pix2Pix
-do not retry FontDiffuser / diffusion as mainline
-do not stack refiner or selector patches
-do not compare models without fixed evaluation
-do not start full training before smoke validation
-do not mix multiple styles before single-style structure is stable
 ```
 
 ## Frontend Boundary

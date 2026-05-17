@@ -6,11 +6,10 @@
 中文单字书法生成
 弱配对监督
 结构保真优先
-先不继续训练
 先重建 preprocessing / evaluation / structure-aware loss
 ```
 
-本仓库不再把 Pix2Pix、继续加 epoch、FontDiffuser retry 当作当前主线。当前唯一保留的可用模型版本是：
+当前保留的基线模型版本是：
 
 ```text
 U-Net L1 baseline best.pt
@@ -39,7 +38,7 @@ y = 目标书法字 target glyph
 y_hat = f_theta(x)
 ```
 
-但下一阶段不能只用裸 U-Net + L1。需要显式加入：
+下一阶段的模型输入、监督和评价需要显式加入：
 
 ```text
 mask
@@ -48,41 +47,6 @@ distance transform
 hole / white-space map
 ink density
 fixed high-risk evaluation board
-```
-
-## What Is Kept
-
-保留：
-
-```text
-scripts/audit_dataset.py
-scripts/prepare_glyph_pairs.py
-scripts/train_unet_baseline.py
-scripts/evaluate_quality.py
-scripts/generate_eval_board.py
-scripts/modal_train_unet.py
-docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md
-docs/GPT_PRO_ALGORITHM_RESEARCH_PROMPT.md
-docs/baseline_unet_l1_zhaomengfu_256_100ep.md
-```
-
-## What Is Not Current Mainline
-
-不再作为当前训练入口：
-
-```text
-plain Pix2Pix
-U-Net resume / continue training
-FontDiffuser retry
-diffusion large training
-refiner stacking
-3x3090 parallel experiment sweep
-```
-
-原因见：
-
-```text
-docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md
 ```
 
 ## Data
@@ -133,31 +97,9 @@ python3 scripts/prepare_glyph_pairs.py \
   --max-items 1000
 ```
 
-训练 U-Net baseline 只用于复现，不作为继续调参入口：
-
-```bash
-python3 scripts/train_unet_baseline.py \
-  --data-dir data/processed/single_writer_glyph_pairs \
-  --out-dir outputs/unet_baseline \
-  --epochs 20 \
-  --batch-size 16 \
-  --image-size 256
-```
-
-生成固定评估板：
-
-```bash
-python3 scripts/generate_eval_board.py \
-  --checkpoint outputs/unet_baseline/checkpoints/best.pt \
-  --content-font /System/Library/Fonts/Supplemental/Songti.ttc \
-  --text 一二三人日田回国民夜耀翔龟鬱齋 \
-  --out outputs/unet_baseline/eval_board.png \
-  --image-size 256
-```
-
 ## Next Valid Work
 
-下一步不是继续训练，而是实现结构化底座：
+下一步是实现结构化底座：
 
 ```text
 1. preprocessing:
@@ -173,13 +115,63 @@ python3 scripts/generate_eval_board.py \
    gray + mask + edge + density + hole + bbox loss
 ```
 
-没有上述三件事，不启动新的完整训练。
+## Structure-Aware Preprocessing
+
+从已有 `manifest.csv` paired dataset 生成结构辅助图和 metadata：
+
+```bash
+python3 scripts/build_structure_dataset.py \
+  --data-dir data/processed/zhaomengfu_full_256 \
+  --out-dir data/processed/zhaomengfu_structure_256 \
+  --threshold 220 \
+  --workers 8
+```
+
+输出包括：
+
+```text
+content_mask / content_skeleton / content_distance / content_hole
+target_mask / target_skeleton / target_distance / target_edge / target_hole
+manifest.csv
+metadata.jsonl
+structure_summary.json
+```
+
+小样本 smoke：
+
+```bash
+python3 scripts/build_structure_dataset.py \
+  --data-dir data/processed/smoke_zhaomengfu_128 \
+  --out-dir outputs/structure_smoke_128 \
+  --max-items 8
+```
+
+## Fixed Structural Evaluation
+
+使用固定结构分组评估 baseline：
+
+```bash
+python3 scripts/evaluate_quality.py \
+  --checkpoint artifacts/baseline_unet_l1_zhaomengfu_256_100ep/checkpoints/best.pt \
+  --content-font /System/Library/Fonts/Supplemental/Songti.ttc \
+  --groups-file configs/eval_groups_stage1.json \
+  --out-dir outputs/structure_eval_baseline_best \
+  --image-size 256
+```
+
+主要输出：
+
+```text
+eval_board.png
+quality_metrics.csv
+quality_summary.json
+generated/
+```
 
 ## Important Docs
 
 ```text
-docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md
-docs/GPT_PRO_ALGORITHM_RESEARCH_PROMPT.md
+docs/ALGORITHM_PLAN.md
 docs/baseline_unet_l1_zhaomengfu_256_100ep.md
 docs/CLOUD_MIGRATION.md
 docs/COLLABORATION.md

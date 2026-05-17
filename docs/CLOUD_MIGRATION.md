@@ -1,9 +1,6 @@
 # Cloud Migration Notes
 
-## Current Rule
-
-Do not launch new full training runs until the structure-aware preprocessing and
-evaluation protocol are implemented.
+## Current Cloud Use
 
 Cloud should currently be used for:
 
@@ -11,18 +8,7 @@ Cloud should currently be used for:
 dataset audit
 preprocessing verification
 fixed evaluation generation
-small smoke runs only
 artifact storage
-```
-
-Not for:
-
-```text
-plain Pix2Pix
-U-Net resume
-blind epoch extension
-3x3090 experiment sweeps
-FontDiffuser retry
 ```
 
 ## Preferred Server
@@ -103,6 +89,4 @@ python3 scripts/prepare_glyph_pairs.py \
   --max-items 1000
 ```
 
-Generate evaluation board only after fixed evaluation characters are defined.
-
-Full training requires approval from `docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md`.
+Generate evaluation board from the fixed structure groups in `configs/eval_groups_stage1.json`.
