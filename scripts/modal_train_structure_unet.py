@@ -251,6 +251,7 @@ def prepared_result(remote_structure_dir: str, workers: int, epochs: int, batch_
         "-m",
         "modal",
         "run",
+        "--detach",
         "scripts/modal_train_structure_unet.py",
         "--mode",
         "train",
@@ -262,6 +263,7 @@ def prepared_result(remote_structure_dir: str, workers: int, epochs: int, batch_
         str(epochs),
         "--batch-size",
         str(batch_size),
+        "--no-detach",
     ]
     return {
         "mode": "prepared",
@@ -329,12 +331,10 @@ def main(
             "workers": workers,
         }
         if detach:
-            call = run_structure_train_full.spawn(run_name, remote_structure_dir, workers, epochs, batch_size, local_tar_in_volume)
-            planned["spawned_call_id"] = call.object_id
-            print(json.dumps(planned, ensure_ascii=False, indent=2), flush=True)
-        else:
-            result = run_structure_train_full.remote(run_name, remote_structure_dir, workers, epochs, batch_size, local_tar_in_volume)
-            print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
+            planned["detach_note"] = "For durable detached execution, pass Modal CLI --detach before the script path and --no-detach to this entrypoint."
+        print(json.dumps(planned, ensure_ascii=False, indent=2), flush=True)
+        result = run_structure_train_full.remote(run_name, remote_structure_dir, workers, epochs, batch_size, local_tar_in_volume)
+        print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
         return
 
     if detach:
