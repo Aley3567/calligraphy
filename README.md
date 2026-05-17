@@ -1,45 +1,119 @@
-# Calligraphy Generation Algorithm Prep
+# Calligraphy Generation Algorithm
 
-当前唯一目标：先准备中文手写体/书法体仿真生成算法代码，后续迁移到云端训练。
-
-本目录不改现有前后端项目。它只负责算法准备：
-
-- 审计 `zhuojg/chinese-calligraphy-dataset` 这类按书法家组织的数据。
-- 先选一个书法家训练单风格 baseline。
-- 第一阶段用 U-Net / Pix2Pix 思路跑通 `标准字形 content -> 目标书法字形 target`。
-- 输出固定测试字评估板，重点看结构清晰、缺笔多笔、笔画粘连、是否便于骨架提取。
-- 后续云端再接 VQ-Font / MX-Font 做正式 few-shot 字体生成实验。
-
-前端植入边界：
-
-- 可放到前端：用户上传样本后的去噪、二值化、倾斜校正、字符区域定位、字符分割预览、特征提取。
-- 不放普通前端：训练数据集解压、书法家统计、content-target pair 生成、train/val split、epoch、batch size、loss、checkpoint、CUDA 日志。
-- 训练与云端任务放后台/实验端，包装为模型训练任务、风格库、模型版本和固定评估图。
-
-## Directory
+当前目标已经收口：
 
 ```text
-calligraphy_generation_algo/
-  configs/                 # 训练配置
-  data/
-    raw/                   # 原始数据集放这里，或软链接到这里
-    processed/             # 处理后的单书法家配对数据
-  docs/                    # 算法说明和迁移说明
-  outputs/                 # 训练日志、checkpoint、评估板
-  repos/                   # 后续可放 VQ-Font/MX-Font 源码
-  runtime_models/          # 训练完成后导出的模型
-  scripts/                 # 数据审计、预处理、训练、评估脚本
+中文单字书法生成
+弱配对监督
+结构保真优先
+先不继续训练
+先重建 preprocessing / evaluation / structure-aware loss
 ```
 
-## First Run
+本仓库不再把 Pix2Pix、继续加 epoch、FontDiffuser retry 当作当前主线。当前唯一保留的可用模型版本是：
 
-1. 放入或软链接原始数据集：
-
-```bash
-ln -s /path/to/chinese-calligraphy-dataset /Users/admin/Desktop/calligraphy_generation_algo/data/raw/chinese-calligraphy-dataset
+```text
+U-Net L1 baseline best.pt
+Release: baseline-unet-l1-zhaomengfu-256-100ep
 ```
 
-2. 审计数据：
+Release:
+
+```text
+https://github.com/Aley3567/calligraphy/releases/tag/baseline-unet-l1-zhaomengfu-256-100ep
+```
+
+## Current Algorithm Position
+
+这个任务不是普通 paired image-to-image translation，而是：
+
+```text
+weakly paired, single-style, structure-preserving Chinese calligraphy glyph generation
+```
+
+当前输入输出定义：
+
+```text
+x = 标准字体渲染出的 content glyph
+y = 目标书法字 target glyph
+y_hat = f_theta(x)
+```
+
+但下一阶段不能只用裸 U-Net + L1。需要显式加入：
+
+```text
+mask
+skeleton
+distance transform
+hole / white-space map
+ink density
+fixed high-risk evaluation board
+```
+
+## What Is Kept
+
+保留：
+
+```text
+scripts/audit_dataset.py
+scripts/prepare_glyph_pairs.py
+scripts/train_unet_baseline.py
+scripts/evaluate_quality.py
+scripts/generate_eval_board.py
+scripts/modal_train_unet.py
+docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md
+docs/GPT_PRO_ALGORITHM_RESEARCH_PROMPT.md
+docs/baseline_unet_l1_zhaomengfu_256_100ep.md
+```
+
+## What Is Not Current Mainline
+
+不再作为当前训练入口：
+
+```text
+plain Pix2Pix
+U-Net resume / continue training
+FontDiffuser retry
+diffusion large training
+refiner stacking
+3x3090 parallel experiment sweep
+```
+
+原因见：
+
+```text
+docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md
+```
+
+## Data
+
+使用数据集：
+
+```text
+zhuojg/chinese-calligraphy-dataset
+https://github.com/zhuojg/chinese-calligraphy-dataset
+```
+
+本阶段使用的单风格：
+
+```text
+楷-赵孟俯三门记
+约 7200 images
+约 6388 unique characters
+256x256 grayscale pairs
+```
+
+数据目录结构：
+
+```text
+书法家或风格目录 / 汉字目录 / 数字.gif
+```
+
+数字文件名不是标签，汉字目录名才是字符标签。
+
+## Local First Run
+
+审计数据：
 
 ```bash
 python3 scripts/audit_dataset.py \
@@ -47,68 +121,66 @@ python3 scripts/audit_dataset.py \
   --out-dir outputs/audit
 ```
 
-3. 选一个书法家后准备 U-Net baseline 数据：
+准备单风格 glyph pairs：
 
 ```bash
-python3 scripts/prepare_pix2pix_pairs.py \
+python3 scripts/prepare_glyph_pairs.py \
   --raw-root data/raw/chinese-calligraphy-dataset \
   --writer-name WRITER_FOLDER_NAME \
   --content-font /System/Library/Fonts/Supplemental/Songti.ttc \
-  --out-dir data/processed/single_writer_pix2pix \
-  --image-size 128 \
+  --out-dir data/processed/single_writer_glyph_pairs \
+  --image-size 256 \
   --max-items 1000
 ```
 
-4. 训练 baseline：
+训练 U-Net baseline 只用于复现，不作为继续调参入口：
 
 ```bash
 python3 scripts/train_unet_baseline.py \
-  --data-dir data/processed/single_writer_pix2pix \
+  --data-dir data/processed/single_writer_glyph_pairs \
   --out-dir outputs/unet_baseline \
   --epochs 20 \
   --batch-size 16 \
-  --image-size 128
+  --image-size 256
 ```
 
-5. 生成固定评估板：
+生成固定评估板：
 
 ```bash
 python3 scripts/generate_eval_board.py \
   --checkpoint outputs/unet_baseline/checkpoints/best.pt \
   --content-font /System/Library/Fonts/Supplemental/Songti.ttc \
-  --text 一中国永道德山水风月 \
-  --out outputs/unet_baseline/eval_board.png
+  --text 一二三人日田回国民夜耀翔龟鬱齋 \
+  --out outputs/unet_baseline/eval_board.png \
+  --image-size 256
 ```
 
-## Algorithm Links
+## Next Valid Work
 
-zhuojg/chinese-calligraphy-dataset: https://github.com/zhuojg/chinese-calligraphy-dataset
+下一步不是继续训练，而是实现结构化底座：
 
-Pix2Pix: https://github.com/phillipi/pix2pix
+```text
+1. preprocessing:
+   target gray / clean mask / skeleton / distance transform / hole map / metadata
 
-U-Net: https://arxiv.org/abs/1505.04597
+2. evaluation:
+   seen / unseen / high-risk / structure groups
+   ink ratio / local density / hole preservation / skeleton metrics
 
-VQ-Font: https://github.com/awei669/VQ-Font
-
-MX-Font: https://github.com/clovaai/mxfont
-
-fewshot-font-generation: https://github.com/clovaai/fewshot-font-generation
-
-FsFont: https://github.com/tlc121/FsFont
-
-DG-Font: https://github.com/ecnuycxie/DG-Font
-
-## Cloud 3x3090 Quick Start
-
-```bash
-chmod +x scripts/*.sh
-FONT=/usr/share/fonts/truetype/arphic/uming.ttc ./scripts/launch_prepare_full.sh
-./scripts/launch_3x3090_experiments.sh
-./scripts/evaluate_all_checkpoints.sh
+3. model:
+   structure-aware U-Net
+   mask head + ink head
+   gray + mask + edge + density + hole + bbox loss
 ```
 
-三组并行实验：
+没有上述三件事，不启动新的完整训练。
 
-- `unet_l1_128_full`: 快速结构 baseline。
-- `pix2pix_128_full`: 对比 GAN 是否增强风格、是否破坏结构。
-- `unet_l1_256_full`: 检查更高分辨率下笔画和骨架是否更清楚。
+## Important Docs
+
+```text
+docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md
+docs/GPT_PRO_ALGORITHM_RESEARCH_PROMPT.md
+docs/baseline_unet_l1_zhaomengfu_256_100ep.md
+docs/CLOUD_MIGRATION.md
+docs/COLLABORATION.md
+```

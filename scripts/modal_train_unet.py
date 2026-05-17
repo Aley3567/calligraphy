@@ -89,7 +89,7 @@ def train_unet_remote(
     run(
         [
             sys.executable,
-            "scripts/prepare_pix2pix_pairs.py",
+            "scripts/prepare_glyph_pairs.py",
             "--raw-root",
             str(REMOTE_RAW_ROOT),
             "--writer-name",

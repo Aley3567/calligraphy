@@ -1,77 +1,106 @@
 # Collaboration Workflow
 
-## Roles
+## Current Shared Goal
 
-- Friend/main owner: owns the GitHub repository, cloud server, main branch, and final merge decisions.
-- yufeng: watches the full process, reviews pull requests, opens issues, and submits PRs for fixes or improvements.
+The repository should now align around one target:
+
+```text
+structure-preserving Chinese calligraphy glyph generation
+```
+
+Current promoted model artifact:
+
+```text
+U-Net L1 baseline best.pt
+```
+
+Current next work:
+
+```text
+preprocessing + evaluation + structure-aware loss infrastructure
+```
+
+Not current work:
+
+```text
+plain Pix2Pix
+U-Net resume
+blind epoch extension
+3x3090 experiment sweep
+FontDiffuser retry
+```
 
 ## Branch Rules
 
-- `main`: stable code only.
-- `dev`: integration branch if needed.
-- `feature/*`: implementation branches.
-- `fix/*`: bug-fix branches.
-- `reports/*`: optional branch for lightweight reports only.
+```text
+main: stable code and docs
+feature/preprocessing: mask/skeleton/distance/hole map pipeline
+feature/evaluation: fixed boards and structural metrics
+feature/structure-aware-unet: mask-head/ink-head and loss work
+```
 
-Do not push directly to `main`.
+Do not push large artifacts to git.
 
-## GitHub Monitoring
+## GitHub Issues
 
-Use GitHub Issues for cloud training monitoring.
-
-Recommended issues:
-
-- `[Training Monitor] unet_l1_128_full`
-- `[Training Monitor] pix2pix_128_full`
-- `[Training Monitor] unet_l1_256_full`
-
-Cloud server should comment progress every 5 or 10 epochs:
+Recommended issues now:
 
 ```text
-epoch: 25/100
-train loss:
-val loss:
-latest eval board:
-risk:
-next:
+[Preprocessing] target mask/skeleton/distance/hole maps
+[Evaluation] fixed high-risk character board and metrics
+[Model] structure-aware U-Net loss design
+[Docs] algorithm audit and stop rules
+```
+
+Avoid issues like:
+
+```text
+[Training] run Pix2Pix again
+[Training] continue U-Net epochs
 ```
 
 ## What Goes Into Git
 
 Commit:
 
-- `README.md`
-- `requirements.txt`
-- `configs/`
-- `docs/`
-- `scripts/`
-- `.gitignore`
+```text
+README.md
+requirements.txt
+configs/
+docs/
+scripts/
+small documentation images
+```
 
 Do not commit:
 
-- raw dataset zip
-- extracted dataset
-- processed training pairs
-- checkpoints
-- cloud outputs
-- runtime models
-
-Large files stay on cloud disk, object storage, or a separate shared drive.
-
-## Cloud Handoff
-
-First cloud commands:
-
-```bash
-pip install -r requirements.txt
-chmod +x scripts/*.sh
-FONT=/usr/share/fonts/truetype/arphic/uming.ttc ./scripts/launch_prepare_full.sh
-./scripts/launch_3x3090_experiments.sh
+```text
+raw datasets
+processed datasets
+checkpoints
+cloud outputs
+runtime models
+zip/tar archives
 ```
 
-Generate fixed evaluation reports:
+Large model files go to:
 
-```bash
-./scripts/evaluate_all_checkpoints.sh
+```text
+GitHub Release
+cloud disk
+object storage
+shared drive
 ```
 
+## Review Gate
+
+Before any new training PR is accepted, it must show:
+
+```text
+fixed evaluation characters
+expected failure mode addressed
+loss definition
+smoke validation result
+stop rule
+comparison target: U-Net baseline best.pt
+```

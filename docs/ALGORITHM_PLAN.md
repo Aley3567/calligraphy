@@ -2,81 +2,141 @@
 
 ## Stage 1 Scope
 
-老师已确认第一步先做中文手写体/书法体仿真生成，不先考虑英文、数字和各种标点符号。
+老师已确认第一阶段先做中文书法/手写体仿真生成，不先考虑英文、数字和标点。
 
-因此第一阶段只做：
+当前任务定义：
 
-- 中文字符
-- 单书法家
-- 标准字形 content 到书法风格 target
-- 结构清楚优先
-- 能训练、能推理、能生成评估板
+```text
+weakly paired, single-style, structure-preserving Chinese calligraphy glyph generation
+```
 
-## Why Not Classification
+即：
 
-分类模型只能回答一张字像哪个书法家，不能根据用户输入的新字生成对应风格的图像。
+```text
+标准字体 content glyph -> 单风格书法 glyph
+```
 
-本项目需要的是生成，不是识别。
+但这个定义只是工程入口，不是完整算法目标。完整目标必须显式保护：
 
-## Why Baseline First
+```text
+汉字结构
+笔画骨架
+内部留白
+墨色密度
+复杂字可读性
+```
 
-先用 U-Net / Pix2Pix 思路跑通 baseline，不是因为它最终一定最强，而是因为它最适合先验证工程链路：
+## Current Model Status
 
-- 数据能否清洗成 paired samples。
-- 标准 content 字形能否稳定渲染。
-- 模型能否学到基本风格转换。
-- 输出是否结构清楚。
-- 训练结果能否接入后端。
+保留为当前主基线：
 
-## Frontend and Preprocessing Boundary
+```text
+U-Net L1 baseline best.pt
+baseline best val_l1 = 0.12746000836292903
+```
 
-前端可以植入“用户样本预处理”，但不要把“训练数据集预处理”原样暴露给普通用户。
+不进入主线：
 
-两条流程必须分开：
+```text
+Pix2Pix:
+  val_l1 = 0.19153394765324064
+  reason = local realism damaged global glyph structure
 
-- 用户样本预处理：前端可展示，属于计划书功能。包括导入样本、去噪、二值化、倾斜校正、字符区域定位、字符分割预览、特征提取。
-- 训练数据预处理：后台/云端流程，不放到普通用户前端。包括解压数据集、按书法家统计、生成 content-target pair、train/val split、epoch、batch size、loss、checkpoint、CUDA 日志。
+U-Net resume:
+  val_l1 = 0.12922164450089138
+  reason = did not beat baseline best and continued dark/thick stroke risk
+```
 
-前端普通用户流程建议保持为：
+## Why Training Is Paused
 
-- 导入样本
-- 预处理
-- 字符分割
-- 特征提取
-- 输入中文文本
-- 选择风格
-- 生成笔迹
-- 查看结果
+继续裸 U-Net + L1、继续加 epoch、继续 Pix2Pix 都已经暴露同一个问题：
 
-后台或实验端可以展示：
+```text
+loss 优化不等于汉字结构变好
+```
 
-- 内置书法样本库
-- 书法家风格库
-- 样本数量
-- 覆盖字符
-- 模型版本
-- 训练状态
-- 固定测试字评估图
+当前最危险的失败模式：
 
-远端训练不算“假”。真实系统可以表现为：提交训练任务、云端训练中、训练完成后同步模型。普通用户界面不要出现 `manifest.csv`、`prepare_pix2pix_pairs.py`、`CUDA`、`checkpoint` 这类开发痕迹。
+```text
+笔画变黑变厚
+内部留白被吃
+复杂字糊成黑块
+局部像书法但整体不像字
+```
 
-## Known Risk
+因此后续不能再以 `val_l1` 或单张 preview 作为主判断依据。
 
-新算法不是银弹。VQ-Font、MX-Font、U-Net、Pix2Pix 也可能出现复杂字泛化差、风格弱、缺笔多笔、笔画粘连等问题。
+## Next Valid Algorithm Direction
 
-降低风险靠的是一整套方法：
+下一阶段只允许做结构化底座：
 
-- 数据清洗
-- 标准字形 content 强约束
-- 单风格先跑通
-- 固定测试字评估板
-- 骨架、轮廓、连通区域、墨迹密度等结构指标
-- 坏结果拒绝机制
+```text
+1. preprocessing:
+   clean mask
+   skeleton
+   distance transform
+   hole map
+   metadata
 
-## Next Algorithms
+2. evaluation:
+   fixed high-risk character board
+   seen / unseen split
+   structure-type groups
+   ink density
+   hole preservation
+   skeleton recall / precision
 
-baseline 跑通后，再把数据迁移到：
+3. model:
+   structure-aware U-Net
+   mask head + ink head
+   gray + mask + edge + density + hole + bbox loss
+```
 
-- VQ-Font: few-shot font generation, PyTorch, 适合做正式模型候选。
-- MX-Font: few-shot font generation, 可作为对照或备选。
-- fewshot-font-generation: 统一仓库，可参考 FUNIT、DM-Font、LF-Font、MX-Font 的数据和评估组织。
+## Forbidden For Now
+
+```text
+do not continue U-Net L1 epochs
+do not run plain Pix2Pix
+do not retry FontDiffuser / diffusion as mainline
+do not stack refiner or selector patches
+do not compare models without fixed evaluation
+do not start full training before smoke validation
+do not mix multiple styles before single-style structure is stable
+```
+
+## Frontend Boundary
+
+前端可以展示用户样本预处理：
+
+```text
+导入样本
+去噪
+二值化
+倾斜校正
+字符区域定位
+字符分割预览
+特征提取
+```
+
+训练数据预处理和模型训练不放普通用户前端：
+
+```text
+数据集解压
+train/val split
+loss
+epoch
+batch size
+checkpoint
+CUDA logs
+```
+
+系统最终可以把云端训练包装成：
+
+```text
+模型版本
+风格库
+评估图
+训练状态
+```
+
+而不是暴露底层训练细节。

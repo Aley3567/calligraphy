@@ -1,18 +1,40 @@
 # Cloud Migration Notes
 
+## Current Rule
+
+Do not launch new full training runs until the structure-aware preprocessing and
+evaluation protocol are implemented.
+
+Cloud should currently be used for:
+
+```text
+dataset audit
+preprocessing verification
+fixed evaluation generation
+small smoke runs only
+artifact storage
+```
+
+Not for:
+
+```text
+plain Pix2Pix
+U-Net resume
+blind epoch extension
+3x3090 experiment sweeps
+FontDiffuser retry
+```
+
 ## Preferred Server
 
-优先要 Linux + NVIDIA GPU。
-
-建议配置：
-
-- Ubuntu 20.04 或 22.04
-- Python 3.9 或 3.10
-- CUDA 11.8 或 12.1
-- GPU 显存至少 12GB，最好 24GB
-- 磁盘至少 100GB
-- 支持 SSH 登录
-- 支持 `scp` 或 `rsync`
+```text
+Ubuntu 20.04 or 22.04
+Python 3.9 or 3.10
+CUDA 11.8 or 12.1
+GPU >= 12GB VRAM, preferably 24GB
+disk >= 100GB
+SSH / rsync / scp available
+```
 
 ## Cloud Directory
 
@@ -24,22 +46,34 @@
     processed/
   docs/
   outputs/
-  repos/
   runtime_models/
   scripts/
 ```
 
 ## Upload Items
 
-迁移时至少上传：
+Upload:
 
-- `scripts/`
-- `configs/`
-- `docs/`
-- `requirements.txt`
-- 原始书法数据集或处理后的 `data/processed/`
+```text
+README.md
+requirements.txt
+configs/
+docs/
+scripts/
+```
 
-不要只上传 checkpoint。云端需要能从数据审计、预处理、训练到评估完整复现。
+Do not put these in git:
+
+```text
+raw dataset zip
+extracted dataset
+processed training pairs
+checkpoints
+runtime models
+cloud outputs
+```
+
+Use GitHub Release or object storage for model weights.
 
 ## Basic Commands
 
@@ -47,36 +81,28 @@
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python3 scripts/audit_dataset.py --raw-root data/raw/chinese-calligraphy-dataset --out-dir outputs/audit
+
+python3 scripts/audit_dataset.py \
+  --raw-root data/raw/chinese-calligraphy-dataset \
+  --out-dir outputs/audit
 ```
 
-## 3x3090 Stage 1 Commands
+## Current Smoke-Only Preparation
 
-先准备全量 paired 数据：
+Prepare a small paired glyph set:
 
 ```bash
-chmod +x scripts/*.sh
-FONT=/usr/share/fonts/truetype/arphic/uming.ttc ./scripts/launch_prepare_full.sh
+FONT=/usr/share/fonts/truetype/arphic/uming.ttc
+
+python3 scripts/prepare_glyph_pairs.py \
+  --raw-root data/raw/chinese-calligraphy-dataset \
+  --writer-name "楷-赵孟俯三门记" \
+  --content-font "$FONT" \
+  --out-dir data/processed/zhaomengfu_smoke_256 \
+  --image-size 256 \
+  --max-items 1000
 ```
 
-再并行启动三组实验：
+Generate evaluation board only after fixed evaluation characters are defined.
 
-```bash
-./scripts/launch_3x3090_experiments.sh
-```
-
-查看日志：
-
-```bash
-tail -f outputs/cloud_logs/unet_l1_128_full.log
-tail -f outputs/cloud_logs/pix2pix_128_full.log
-tail -f outputs/cloud_logs/unet_l1_256_full.log
-```
-
-训练中或训练后统一生成固定评估板和质量指标：
-
-```bash
-./scripts/evaluate_all_checkpoints.sh
-```
-
-第一阶段只看中文结构，不接英文、数字、标点。
+Full training requires approval from `docs/ALGORITHM_AUDIT_AND_NEXT_STAGE.md`.

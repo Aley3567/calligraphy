@@ -16,7 +16,7 @@ python3 scripts/audit_dataset.py \
   --raw-root "$RAW_ROOT" \
   --out-dir outputs/audit_real_dataset
 
-python3 scripts/prepare_pix2pix_pairs.py \
+python3 scripts/prepare_glyph_pairs.py \
   --raw-root "$RAW_ROOT" \
   --writer-name "$WRITER" \
   --content-font "$FONT" \
@@ -24,11 +24,10 @@ python3 scripts/prepare_pix2pix_pairs.py \
   --image-size 128 \
   --max-items 0
 
-python3 scripts/prepare_pix2pix_pairs.py \
+python3 scripts/prepare_glyph_pairs.py \
   --raw-root "$RAW_ROOT" \
   --writer-name "$WRITER" \
   --content-font "$FONT" \
   --out-dir data/processed/zhaomengfu_full_256 \
   --image-size 256 \
   --max-items 0
-
