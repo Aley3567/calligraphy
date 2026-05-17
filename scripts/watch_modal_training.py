@@ -50,6 +50,21 @@ def download_train_log(volume: str, remote_dir: str, local_dir: Path) -> Path | 
     return target
 
 
+def latest_preview_epoch(volume: str, remote_dir: str) -> int | None:
+    proc = run(["python3", "-m", "modal", "volume", "ls", volume, f"/{remote_dir}/previews"], timeout=60)
+    if proc.returncode != 0:
+        return None
+    epochs: list[int] = []
+    for line in proc.stdout.splitlines():
+        name = line.strip().rsplit("/", 1)[-1]
+        if name.startswith("epoch_") and name.endswith(".png"):
+            try:
+                epochs.append(int(name.removeprefix("epoch_").removesuffix(".png")))
+            except ValueError:
+                pass
+    return max(epochs) if epochs else None
+
+
 def parse_last_epoch(log_path: Path) -> dict:
     if log_path.stat().st_size == 0:
         return {}
@@ -106,6 +121,10 @@ def main() -> None:
             log_path = download_train_log(args.volume, remote_dir, local_artifacts)
             if log_path:
                 epoch_info = parse_last_epoch(log_path)
+                if not epoch_info:
+                    preview_epoch = latest_preview_epoch(args.volume, remote_dir)
+                    if preview_epoch is not None:
+                        epoch_info = {"epoch": preview_epoch, "source": "preview_file"}
                 event["latest_epoch"] = epoch_info
                 current_epoch = epoch_info.get("epoch")
                 if current_epoch != last_epoch or current_epoch is None:
