@@ -39,7 +39,7 @@ def open_grayscale(path: Path) -> Image.Image:
     return img.convert("L")
 
 
-def normalize_ink_image(img: Image.Image, image_size: int) -> Image.Image:
+def normalize_ink_image(img: Image.Image, image_size: int, resize_mode: str = "thumbnail", padding: int = 16) -> Image.Image:
     img = ImageOps.exif_transpose(img).convert("L")
     arr = np.asarray(img).astype(np.float32)
 
@@ -55,8 +55,20 @@ def normalize_ink_image(img: Image.Image, image_size: int) -> Image.Image:
         y0, y1 = ys.min(), ys.max() + 1
         arr = arr[y0:y1, x0:x1]
 
+    max_side = image_size - padding
+    if max_side <= 0:
+        raise ValueError(f"padding must be smaller than image_size, got image_size={image_size}, padding={padding}")
+
     cropped = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
-    cropped.thumbnail((image_size - 16, image_size - 16), Image.Resampling.LANCZOS)
+    if resize_mode == "thumbnail":
+        cropped.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
+    elif resize_mode == "fit":
+        scale = min(max_side / float(cropped.width), max_side / float(cropped.height))
+        new_size = (max(1, int(round(cropped.width * scale))), max(1, int(round(cropped.height * scale))))
+        cropped = cropped.resize(new_size, Image.Resampling.LANCZOS)
+    else:
+        raise ValueError(f"unsupported resize_mode: {resize_mode}")
+
     canvas = Image.new("L", (image_size, image_size), 255)
     left = (image_size - cropped.width) // 2
     top = (image_size - cropped.height) // 2
@@ -64,8 +76,8 @@ def normalize_ink_image(img: Image.Image, image_size: int) -> Image.Image:
     return canvas
 
 
-def render_content_char(char: str, font_path: Path, image_size: int) -> Image.Image:
-    font_size = int(image_size * 0.78)
+def render_content_char(char: str, font_path: Path, image_size: int, font_scale: float = 0.78) -> Image.Image:
+    font_size = max(1, int(image_size * font_scale))
     font = ImageFont.truetype(str(font_path), font_size)
     canvas = Image.new("L", (image_size, image_size), 255)
     draw = ImageDraw.Draw(canvas)

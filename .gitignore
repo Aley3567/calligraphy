@@ -32,3 +32,15 @@ artifacts/
 logs/
 wandb/
 runs/
+
+# Local assistant/editor/session artifacts and exploratory branches.
+.ml_context_pack.md
+.monitoring/
+.windsurf/
+_quarantine_*/
+experiments/
+progress.txt
+HANDOFF_STYLE_REF_RESIDUAL_PRIOR.md
+
+# Keep GitHub handoff docs small and clean; upload datasets as Release assets.
+dist/

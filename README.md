@@ -9,6 +9,19 @@
 先重建 preprocessing / evaluation / structure-aware loss
 ```
 
+## Handoff
+
+This repository is now prepared as a clean handoff package for continuing the
+calligraphy generation work on a stronger GPU machine.
+
+Start here:
+
+- `docs/HANDOFF_TO_COLLABORATOR.md`
+- `docs/NEXT_AI_PROMPT.md`
+
+Large prepared datasets and model artifacts should be downloaded from GitHub
+Releases instead of committed to git.
+
 当前保留的基线模型版本是：
 
 ```text

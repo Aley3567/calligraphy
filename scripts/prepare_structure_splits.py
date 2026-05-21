@@ -33,6 +33,8 @@ def main() -> None:
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--seed", default=42, type=int)
     parser.add_argument("--train-ratio", default=0.9, type=float)
+    parser.add_argument("--train-count", default=0, type=int)
+    parser.add_argument("--val-count", default=0, type=int)
     args = parser.parse_args()
 
     data_dir = args.data_dir.expanduser().resolve()
@@ -40,7 +42,7 @@ def main() -> None:
     manifest_path = data_dir / "manifest.csv"
     if not manifest_path.exists():
         raise FileNotFoundError(f"manifest not found: {manifest_path}")
-    if not 0.0 < args.train_ratio < 1.0:
+    if args.train_count <= 0 and not 0.0 < args.train_ratio < 1.0:
         raise ValueError("--train-ratio must be between 0 and 1")
 
     with manifest_path.open("r", encoding="utf-8", newline="") as f:
@@ -61,9 +63,20 @@ def main() -> None:
 
     rng = random.Random(args.seed)
     rng.shuffle(usable)
-    train_count = int(len(usable) * args.train_ratio)
-    train_rows = usable[:train_count]
-    val_rows = usable[train_count:]
+    if args.train_count > 0 or args.val_count > 0:
+        if args.train_count <= 0 or args.val_count <= 0:
+            raise ValueError("--train-count and --val-count must be used together")
+        requested = args.train_count + args.val_count
+        if requested > len(usable):
+            raise ValueError(f"requested {requested} rows but only {len(usable)} usable rows are available")
+        train_count = args.train_count
+        val_count = args.val_count
+        train_rows = usable[:train_count]
+        val_rows = usable[train_count : train_count + val_count]
+    else:
+        train_count = int(len(usable) * args.train_ratio)
+        train_rows = usable[:train_count]
+        val_rows = usable[train_count:]
 
     write_manifest(out_dir / "train_manifest.csv", train_rows, fieldnames)
     write_manifest(out_dir / "val_manifest.csv", val_rows, fieldnames)
@@ -75,6 +88,8 @@ def main() -> None:
         "source_manifest": str(manifest_path),
         "seed": args.seed,
         "train_ratio": args.train_ratio,
+        "train_count_requested": args.train_count,
+        "val_count_requested": args.val_count,
         "total_rows": len(rows),
         "usable_rows": len(usable),
         "rejected_empty_content_rows": len(rejected),
