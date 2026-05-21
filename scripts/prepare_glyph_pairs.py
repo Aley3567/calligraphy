@@ -26,6 +26,19 @@ def main() -> None:
     parser.add_argument("--content-font", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--image-size", default=128, type=int)
+    parser.add_argument(
+        "--content-font-scale",
+        default=0.78,
+        type=float,
+        help="Content font size as a fraction of image_size. Keep explicit because content/target scale drift is a known failure mode.",
+    )
+    parser.add_argument(
+        "--target-resize-mode",
+        default="thumbnail",
+        choices=["thumbnail", "fit"],
+        help="thumbnail preserves existing behavior; fit also upscales cropped binary glyphs with LANCZOS for anti-aliased 256 targets.",
+    )
+    parser.add_argument("--target-padding", default=16, type=int)
     parser.add_argument("--max-items", default=0, type=int, help="0 means no limit")
     parser.add_argument("--seed", default=42, type=int)
     args = parser.parse_args()
@@ -56,8 +69,13 @@ def main() -> None:
 
         sample_id = stable_id(f"{args.writer_name}/{path.relative_to(writer_dir)}")
         try:
-            target = normalize_ink_image(open_grayscale(path), args.image_size)
-            content = render_content_char(char, font_path, args.image_size)
+            target = normalize_ink_image(
+                open_grayscale(path),
+                args.image_size,
+                resize_mode=args.target_resize_mode,
+                padding=args.target_padding,
+            )
+            content = render_content_char(char, font_path, args.image_size, font_scale=args.content_font_scale)
             save_pair(content, target, out_dir, sample_id)
         except Exception as exc:  # noqa: BLE001
             skipped.append({"path": str(path), "reason": str(exc)})
@@ -71,11 +89,24 @@ def main() -> None:
                 "source_path": str(path),
                 "content_path": f"content/{sample_id}.png",
                 "target_path": f"target/{sample_id}.png",
+                "target_resize_mode": args.target_resize_mode,
+                "target_padding": args.target_padding,
+                "content_font_scale": args.content_font_scale,
             }
         )
 
     with (out_dir / "manifest.csv").open("w", encoding="utf-8", newline="") as f:
-        fieldnames = ["sample_id", "writer", "char", "source_path", "content_path", "target_path"]
+        fieldnames = [
+            "sample_id",
+            "writer",
+            "char",
+            "source_path",
+            "content_path",
+            "target_path",
+            "target_resize_mode",
+            "target_padding",
+            "content_font_scale",
+        ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
@@ -88,6 +119,9 @@ def main() -> None:
                 "writer_dir": str(writer_dir),
                 "content_font": str(font_path),
                 "image_size": args.image_size,
+                "content_font_scale": args.content_font_scale,
+                "target_resize_mode": args.target_resize_mode,
+                "target_padding": args.target_padding,
                 "pair_count": len(rows),
                 "skipped_count": len(skipped),
                 "skipped_examples": skipped[:100],
@@ -104,4 +138,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

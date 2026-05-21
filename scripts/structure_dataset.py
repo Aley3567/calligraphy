@@ -39,6 +39,7 @@ class StructureGlyphDataset(Dataset):
             self.rows = self.rows[:max_items]
         if not self.rows:
             raise ValueError(f"empty manifest: {self.manifest_path}")
+        self._validate_manifest_stats()
 
     def __len__(self) -> int:
         return len(self.rows)
@@ -48,6 +49,41 @@ class StructureGlyphDataset(Dataset):
         if not value:
             raise KeyError(f"missing manifest column: {key}")
         return self.data_dir / value
+
+    def _validate_manifest_stats(self) -> None:
+        ratio_tolerance = 1e-6
+        bbox_tolerance = 0.5
+        for index, row in enumerate(self.rows):
+            for prefix in ("content", "target"):
+                mask_path = self._path(row, f"{prefix}_mask_path")
+                if not mask_path.exists():
+                    raise FileNotFoundError(f"{prefix} mask not found for manifest row {index}: {mask_path}")
+                mask = np.asarray(Image.open(mask_path).convert("L"), dtype=np.uint8) > 127
+                ink_key = f"{prefix}_ink_ratio"
+                if ink_key in row and row[ink_key] not in {"", None}:
+                    actual = float(mask.mean())
+                    expected = to_float(row, ink_key)
+                    if abs(actual - expected) > ratio_tolerance:
+                        raise ValueError(
+                            f"manifest/data_dir mismatch at row {index} sample={row.get('sample_id', '')} "
+                            f"{ink_key}: manifest={expected:.9f} actual={actual:.9f} "
+                            f"data_dir={self.data_dir} manifest={self.manifest_path}"
+                        )
+
+                bbox_keys = [f"{prefix}_bbox_x0", f"{prefix}_bbox_y0", f"{prefix}_bbox_x1", f"{prefix}_bbox_y1"]
+                if all(key in row and row[key] not in {"", None} for key in bbox_keys):
+                    if mask.any():
+                        ys, xs = np.where(mask)
+                        actual_bbox = [float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)]
+                    else:
+                        actual_bbox = [0.0, 0.0, 0.0, 0.0]
+                    expected_bbox = [to_float(row, key) for key in bbox_keys]
+                    if any(abs(a - e) > bbox_tolerance for a, e in zip(actual_bbox, expected_bbox)):
+                        raise ValueError(
+                            f"manifest/data_dir mismatch at row {index} sample={row.get('sample_id', '')} "
+                            f"{prefix}_bbox: manifest={expected_bbox} actual={actual_bbox} "
+                            f"data_dir={self.data_dir} manifest={self.manifest_path}"
+                        )
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
         row = self.rows[idx]
@@ -59,6 +95,8 @@ class StructureGlyphDataset(Dataset):
 
         target_gray = load_ink(self._path(row, "target_path"))
         target_mask = load_map(self._path(row, "target_mask_path"))
+        target_skeleton = load_map(self._path(row, "target_skeleton_path"))
+        target_distance = load_map(self._path(row, "target_distance_path"))
         target_edge = load_map(self._path(row, "target_edge_path"))
         target_hole = load_map(self._path(row, "target_hole_path"))
 
@@ -77,8 +115,15 @@ class StructureGlyphDataset(Dataset):
 
         return {
             "input": torch.stack([content_gray, content_mask, content_skeleton, content_distance, content_hole], dim=0),
+            "content_gray": content_gray.unsqueeze(0),
+            "content_mask": content_mask.unsqueeze(0),
+            "content_skeleton": content_skeleton.unsqueeze(0),
+            "content_distance": content_distance.unsqueeze(0),
+            "content_hole": content_hole.unsqueeze(0),
             "target_gray": target_gray.unsqueeze(0),
             "target_mask": target_mask.unsqueeze(0),
+            "target_skeleton": target_skeleton.unsqueeze(0),
+            "target_distance": target_distance.unsqueeze(0),
             "target_edge": target_edge.unsqueeze(0),
             "target_hole": target_hole.unsqueeze(0),
             "target_bbox": bbox,
